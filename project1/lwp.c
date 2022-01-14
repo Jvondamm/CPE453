@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include "lwp.h"
 #include <stdlib.h>
+#include <stdbool.h>
 
-
-unsigned long PID = 0;   /* PID                                      */
-lwp_procs = 0;           /* the current number of LWPs               */
-lwp_running = 0;         /* the index of the currently running LWP   */
-/* do I need to malloc lwp_ptable with LWP_PROC_LIMIT here? */
+unsigned long real_sp;      /* real stack pointer that will return to orignal func that calls it */
+unsigned long PID = 0;      /* PID                                      */
+int lwp_procs = 0;              /* the current number of LWPs               */
+int lwp_running = 0;            /* the index of the currently running LWP   */
+schedfun schedular = NULL;  /* schedular function                       */
+void round_robin(bool type);
 
 int new_lwp(lwpfun func, void *arg, size_t stack_size)
 {
@@ -14,7 +16,7 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
         return -1;
     }
 
-    ptr_int_t * ebp, * esp;
+    ptr_int_t *ebp, *esp;
 
     /* number of LWPs and PID will not necessarily match */
     lwp_procs++;
@@ -24,19 +26,21 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     if (!(lwp_ptable[lwp_running].stack = malloc(sizeof(int) * stack_size)))
         return -1;
     lwp_ptable[lwp_running].stacksize = stack_size;
-
     ebp = esp = lwp_ptable[lwp_running].stack + lwp_ptable[lwp_running].stacksize;
 
-    *esp = arg;
+    *esp = (ptr_int_t) arg;
     esp--;
-    *esp = lwp_exit;
+    *esp = (ptr_int_t) lwp_exit;
     esp--;
-    *esp = func;
+    *esp = (ptr_int_t) func;
     esp--;
-    *esp=NULL; /* bogus base pointer */
-    esp--;
+    *esp=0xB; /* bogus base pointer */
+    ebp = esp;
 
-    esp -=6; /* push the bogus registers? */
+    esp--;
+    esp -=6; /* push the bogus registers */
+    esp --; 
+    *esp = (ptr_int_t) ebp; /* address of bogus base pointer */
 
     lwp_ptable[lwp_running].sp = esp;
 
@@ -44,11 +48,25 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
 }
 
 void lwp_exit() {
+
+    /* free current thread stack as we are done with it */
+    free(lwp_ptable[lwp_running].stack);
+
+    /* If no more threads, call stop b/c this thread also exiting */
     lwp_procs--;
     if (lwp_procs <= 0) {
         lwp_stop();
     }
-    free(lwp_ptable[lwp_running].stack);
+
+    /* shift ptable down to remove current process */
+    for(int i = lwp_running + 1; i < lwp_procs + 1; i++) {
+        lwp_ptable[i - 1] = lwp_ptable[i];
+    }
+
+    round_robin(false);
+
+    SetSP(lwp_ptable[lwp_running].sp);
+    RESTORE_STATE();
 }
 
 int lwp_getpid() {
@@ -56,18 +74,48 @@ int lwp_getpid() {
 }
 
 void lwp_yield() {
-   SAVE_STATE();
-    /* TODO: who knows? */
-
-    RESTORE_STATE(); /* restore state of next process */
+    SAVE_STATE();
+    GetSP(lwp_ptable[lwp_running].sp);
+    round_robin(true);
+    SetSP(lwp_ptable[lwp_running].sp);
+    RESTORE_STATE();
 }
 
 void lwp_start() {
     if (lwp_procs == 0) {
         return;
     }
+    SAVE_STATE();
+    GetSP(real_sp);
+    round_robin(false);
+    SetSP(lwp_ptable[lwp_running].sp);
+    RESTORE_STATE();
 }
 
-void lwp_stop()
+void lwp_stop() {
+    SAVE_STATE();
+    SetSP(real_sp)
+    RESTORE_STATE();
+}
 
-void lwp_set_scheduler(schedfun sched)
+void lwp_set_scheduler(schedfun sched) {
+    schedular = sched;
+}
+
+void round_robin(bool type) {
+    if (type) {
+        lwp_running++;
+        if (lwp_running == lwp_procs) {
+            lwp_running = 0;
+        } else {
+            lwp_running = schedfun();
+        }
+    } else {
+        if (schedfun == NULL) {
+            lwp_running = 0;
+        } else {
+            lwp_running = schedfun();
+        }
+
+    }
+}
