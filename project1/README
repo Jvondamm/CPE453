@@ -1,0 +1,19 @@
+# Joshua von Damm (Jvondamm) - Program 1 Light Weight Processes
+# Winter 2022 Professor Peterson 
+
+---------------------------------------------------------------------------
+## 1. How is this LWP library different from a real thread management library?
+---------------------------------------------------------------------------
+
+LWP's schedule and execute by the kernel while a thread management library 
+would be a user thread which would be managed by the library itself and 
+the kernel wouldn't know anything about it. 
+
+---------------------------------------------------------------------------
+## 2. Name two ways in which this LWP library API could be improved.
+---------------------------------------------------------------------------
+
+1. The LWP library API could assign priorities to each lwp, which would change 
+the simple round_robin() scheduler. 
+
+2. It could also add multithreading. 

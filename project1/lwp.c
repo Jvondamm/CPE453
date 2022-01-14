@@ -104,8 +104,7 @@ void lwp_set_scheduler(schedfun sched) {
 
 void round_robin(bool type) {
     if (type) {
-        lwp_running++;
-        if (lwp_running == lwp_procs) {
+        if (lwp_running++ == lwp_procs) {
             lwp_running = 0;
         } else {
             lwp_running = schedfun();
