@@ -29,7 +29,7 @@ $(LWP): lwp.o
 	ranlib $@
 
 lwp.o: lwp.c lwp.h
-	cc -Wall -Werror -g -c -o $@ $<
+	cc -m32 -Wall -Werror -g -c -o $@ $<
 	cc -S $<
 
 smartalloc.o: smartalloc.c
