@@ -162,7 +162,7 @@ void lwp_start() {
     /* we don't want to round robin, but want to run the first thread */
     round_robin(false);
 
-    /* set the stack pointer to the sp of the thread we want to run *
+    /* set the stack pointer to the sp of the thread we want to run */
     SetSP(lwp_ptable[lwp_running].sp);
 
     /* always RESTORE_STATE() before running */
