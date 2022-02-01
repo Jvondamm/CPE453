@@ -34,17 +34,17 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     /* malloc size for the stack int (word) * 4 */
     if (!(lwp_ptable[lwp_running].stack = malloc(sizeof(int) * stack_size)))
         return -1;
-    
+
     /* save stack size */
     lwp_ptable[lwp_running].stacksize = stack_size;
 
-    /* stack starts at high addr. and GROWS DOWN, so the base pointer and 
+    /* stack starts at high addr. and GROWS DOWN, so the base pointer and
     initial stack pointer start at the top */
     ebp = esp = lwp_ptable[lwp_running].stack + lwp_ptable[lwp_running].stacksize;
 
-    /* 
-    Let's say a function is running that is called by main. What 
-    would we expect to see on the stack? 
+    /*
+    Let's say a function is running that is called by main. What
+    would we expect to see on the stack?
     */
 
     /* first, its args, so we push those and DECREMENT the stack pointer,
@@ -52,7 +52,7 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     *esp = (ptr_int_t) arg;
     esp--;
 
-    /* After the function goes through its arguments, it will want a return 
+    /* After the function goes through its arguments, it will want a return
     address to go back to the line main that called it IF it was called
     organically. However in this case we don't want the thread to return
     to main, we want the process running the func to exit. So we instead
@@ -60,26 +60,25 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     *esp = (ptr_int_t) lwp_exit;
     esp--;
 
-    /* These next two are the stack for lwp_start(). This is so lwp_start 
-    starts the func instead of returning to main. To do so, we then want 
-    to push a base pointer. It is called the bogus base pointer because 
+    /* These next two are the stack for lwp_start(). This is so lwp_start
+    starts the func instead of returning to main. To do so, we then want
+    to push a base pointer. It is called the bogus base pointer because
     lwp_start isn't going to return to main */
     *esp = (ptr_int_t) func;
     esp--;
-    *esp=0xB; 
+    *esp=0xB;
     ebp = esp; /* base pointer = stack pointer (explained later) */
-    esp--;
 
     /* We always want to RESTORE_STATE() before running a thread
     because the registers on the stack are from the previous process.
     In this case however, we have allocated a new stack and don't have
     any registers. So we push 6 bogus registers to mimic a SAVE_STATE() */
-    esp -=6;
-    esp --; 
+    esp -=7;
+    /* esp --; */
 
-    /* We then want the address of the bogus B.P. to be 
+    /* We then want the address of the bogus B.P. to be
     pushed here so that... I forgor */
-    *esp = (ptr_int_t) ebp; 
+    *esp = (ptr_int_t) ebp;
 
     /* we want to save the stack pointer so that when we
     call this thread it will know where in memory to start */
@@ -111,7 +110,7 @@ void lwp_exit() {
 
     /* Because we moved each thread down, we don't want to increase
     the index of the scheduler to execute the next thread (round robin)
-    because then it would skip the first one, as we moved it down. So 
+    because then it would skip the first one, as we moved it down. So
     we pass the false value so it won't default to roun robin scheduling. */
     round_robin(false);
 
@@ -131,7 +130,7 @@ int lwp_getpid() {
 void lwp_yield() {
     /* save the current threads' context so when its run again, it can
     resume where it left off */
-    SAVE_STATE(); 
+    SAVE_STATE();
 
     /* save the address of the stack pointer of the thread we are interrupting */
     GetSP(lwp_ptable[lwp_running].sp);
@@ -163,7 +162,7 @@ void lwp_start() {
     /* we don't want to round robin, but want to run the first thread */
     round_robin(false);
 
-    /* set the stack pointer to the sp of the thread we want to run */
+    /* set the stack pointer to the sp of the thread we want to run *
     SetSP(lwp_ptable[lwp_running].sp);
 
     /* always RESTORE_STATE() before running */
@@ -173,7 +172,7 @@ void lwp_start() {
 void lwp_stop() {
 
     /* if we want to stop the current thread, simply save the registers,
-    return to main, then pop the registers off for a clean state. This is 
+    return to main, then pop the registers off for a clean state. This is
     done so if we call lwp_start again, we can start where we left off */
     SAVE_STATE();
     SetSP(real_sp);
@@ -185,11 +184,11 @@ void lwp_set_scheduler(schedfun sched) {
     scheduler = sched;
 }
 
-/* if true, does round-robin scheduling, which means it will simply 
+/* if true, does round-robin scheduling, which means it will simply
 increment the process ID to the next one, and if we are at the end
-of the process table, loop back to the first one. If false, either 
-we are starting the first thread and don't want to increment, 
-or we have deleted a thread (lwp_exit) so we also don't want to 
+of the process table, loop back to the first one. If false, either
+we are starting the first thread and don't want to increment,
+or we have deleted a thread (lwp_exit) so we also don't want to
 increment or we will skip a thread. I kinda got lazy and don't
 wana put the comments inside this func */
 void round_robin(bool type) {
@@ -199,7 +198,7 @@ void round_robin(bool type) {
         } else {
             lwp_running = scheduler();
         }
-    } else { 
+    } else {
         if (scheduler == NULL) {
             lwp_running = 0;
         } else {
@@ -208,3 +207,5 @@ void round_robin(bool type) {
 
     }
 }
+
+
