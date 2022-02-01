@@ -52,7 +52,7 @@ int main(int argc, char *argv[]){
     }
   }
 
-  printf("Launching LWPS\n");
+  printf("Launching LWPS you nerd\n");
 
   /* spawn a number of individual LWPs */
   for(i=1;i<=5;i++) {
@@ -60,8 +60,9 @@ int main(int argc, char *argv[]){
   }
 
   lwp_start();                     /* returns when the last lwp exits */
+  lwp_start();
 
-  printf("Back from LWPS.\n");
+  printf("Back!!\n");
   return 0;
 }
 
@@ -73,6 +74,9 @@ static void indentnum(void *num) {
 
   howfar=(ptr_int_t)num;              /* interpret num as an integer */
   for(i=0;i<howfar;i++){
+    if (i == 2){
+      lwp_stop();
+    }
     printf("%*"PTR_INT_T_FMT"\n",(int)howfar*5,howfar);
     lwp_yield();                /* let another have a turn */
   }
