@@ -22,11 +22,12 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     ptr_int_t *ebp, *esp;
 
     /* number of LWPs and PID will not necessarily match */
-    lwp_procs++;
+    /*lwp_procs++;*/
     PID++;
 
     /* set the current running process to be the one we are creating */
     lwp_running = lwp_procs;
+    lwp_procs++;
 
     /* set the PID */
     lwp_ptable[lwp_running].pid = PID;
@@ -36,7 +37,7 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
         return -1;
 
     /* save stack size */
-    lwp_ptable[lwp_running].stacksize = stack_size;
+    lwp_ptable[lwp_running].stacksize = stack_size * sizeof(int);
 
     /* stack starts at high addr. and GROWS DOWN, so the base pointer and
     initial stack pointer start at the top */
@@ -73,8 +74,7 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     because the registers on the stack are from the previous process.
     In this case however, we have allocated a new stack and don't have
     any registers. So we push 6 bogus registers to mimic a SAVE_STATE() */
-    esp -=7;
-    /* esp --; */
+    esp -=7;    
 
     /* We then want the address of the bogus B.P. to be
     pushed here so that... I forgor */
@@ -193,10 +193,14 @@ increment or we will skip a thread. I kinda got lazy and don't
 wana put the comments inside this func */
 void round_robin(bool type) {
     if (type) {
-        if (lwp_running++ == lwp_procs) {
+        if (lwp_running + 1 == lwp_procs) {
             lwp_running = 0;
         } else {
-            lwp_running = scheduler();
+            if (scheduler == NULL) {
+                lwp_running++;
+            } else {
+                lwp_running = scheduler();
+            }
         }
     } else {
         if (scheduler == NULL) {
