@@ -22,7 +22,6 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     ptr_int_t *ebp, *esp;
 
     /* number of LWPs and PID will not necessarily match */
-    /*lwp_procs++;*/
     PID++;
 
     /* set the current running process to be the one we are creating */
@@ -41,7 +40,8 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
 
     /* stack starts at high addr. and GROWS DOWN, so the base pointer and
     initial stack pointer start at the top */
-    ebp = esp = lwp_ptable[lwp_running].stack + lwp_ptable[lwp_running].stacksize;
+    esp = lwp_ptable[lwp_running].stack + lwp_ptable[lwp_running].stacksize;
+    ebp = esp;
 
     /*
     Let's say a function is running that is called by main. What
@@ -77,7 +77,7 @@ int new_lwp(lwpfun func, void *arg, size_t stack_size)
     esp -=7;    
 
     /* We then want the address of the bogus B.P. to be
-    pushed here so that... I forgor */
+    pushed here so that we can return to it later */
     *esp = (ptr_int_t) ebp;
 
     /* we want to save the stack pointer so that when we
@@ -96,30 +96,36 @@ void lwp_exit() {
 
     /* If there are no more threads existing, we want to terminate */
     lwp_procs--;
-    if (lwp_procs <= 0) {
+    if (lwp_procs == 0) {
         lwp_stop();
+    } else {
+
+        /* If there are threads remaining, we want to remove the current
+        thread from the process table, so we shift down the current
+        threads. */
+        int i;
+        for(i = lwp_running + 1; i < lwp_procs + 1; i++) {
+            lwp_ptable[i - 1] = lwp_ptable[i];
+        }
+
+        /* Because we moved each thread down, we don't want to increase
+        the index of the scheduler to execute the next thread (round robin)
+        because then it would skip the first one, as we moved it down. So
+        we want either first value or whatever the scheduler returns */
+        if (scheduler == NULL) {
+            lwp_running = 0;
+        } else {
+                lwp_running = scheduler();
+        }
+    
+
+        /* now the lwp_running id is set to the next process, so we SETSP()
+        which sets the stack pointer in the resgiter to the thread's sp. */
+        SetSP(lwp_ptable[lwp_running].sp);
+
+        /* We don't want to leave registers on the stack, so we pop them off */
+        RESTORE_STATE();
     }
-
-    /* If there are threads remaining, we want to remove the current
-    thread from the process table, so we shift down the current
-    threads. */
-    int i;
-    for(i = lwp_running + 1; i < lwp_procs + 1; i++) {
-        lwp_ptable[i - 1] = lwp_ptable[i];
-    }
-
-    /* Because we moved each thread down, we don't want to increase
-    the index of the scheduler to execute the next thread (round robin)
-    because then it would skip the first one, as we moved it down. So
-    we pass the false value so it won't default to roun robin scheduling. */
-    round_robin(false);
-
-    /* now the lwp_running id is set to the next process, so we SETSP()
-    which sets the stack pointer in the resgiter to the thread's sp. */
-    SetSP(lwp_ptable[lwp_running].sp);
-
-    /* We don't want to leave registers on the stack, so we pop them off */
-    RESTORE_STATE();
 }
 
 /* simply returns the current PID */
@@ -136,7 +142,14 @@ void lwp_yield() {
     GetSP(lwp_ptable[lwp_running].sp);
 
     /* round robin, go to the next thread */
-    round_robin(true);
+    if (scheduler == NULL) {
+        lwp_running++;
+        if (lwp_running == lwp_procs) {
+            lwp_running = 0;
+        }
+    } else {
+        lwp_running = scheduler();
+    }
 
     /* set the stack pointer register to the new threads sp */
     SetSP(lwp_ptable[lwp_running].sp);
@@ -160,7 +173,12 @@ void lwp_start() {
     GetSP(real_sp);
 
     /* we don't want to round robin, but want to run the first thread */
-    round_robin(false);
+    /*round_robin(false);*/
+    if (scheduler == NULL) {
+        lwp_running = 0;
+    } else {
+        lwp_running = scheduler();
+    }
 
     /* set the stack pointer to the sp of the thread we want to run */
     SetSP(lwp_ptable[lwp_running].sp);
@@ -170,7 +188,6 @@ void lwp_start() {
 }
 
 void lwp_stop() {
-
     /* if we want to stop the current thread, simply save the registers,
     return to main, then pop the registers off for a clean state. This is
     done so if we call lwp_start again, we can start where we left off */
@@ -183,33 +200,3 @@ void lwp_stop() {
 void lwp_set_scheduler(schedfun sched) {
     scheduler = sched;
 }
-
-/* if true, does round-robin scheduling, which means it will simply
-increment the process ID to the next one, and if we are at the end
-of the process table, loop back to the first one. If false, either
-we are starting the first thread and don't want to increment,
-or we have deleted a thread (lwp_exit) so we also don't want to
-increment or we will skip a thread. I kinda got lazy and don't
-wana put the comments inside this func */
-void round_robin(bool type) {
-    if (type) {
-        if (lwp_running + 1 == lwp_procs) {
-            lwp_running = 0;
-        } else {
-            if (scheduler == NULL) {
-                lwp_running++;
-            } else {
-                lwp_running = scheduler();
-            }
-        }
-    } else {
-        if (scheduler == NULL) {
-            lwp_running = 0;
-        } else {
-            lwp_running = scheduler();
-        }
-
-    }
-}
-
-
