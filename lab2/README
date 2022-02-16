@@ -1,0 +1,14 @@
+CPE453, lab2
+Joshua von Damm, Chenchen Nie
+
+-- RUNNING --
+
+no compilation or Makefile as written in python.
+run with:       ./schedSim <args>
+
+-- Questions -- 
+
+1. If the jobs scheduled never have a shorter burst time then the current running job when they arrive, then FIFO and SRTN will have the same turnaround time.
+2. If the job alwys completes at or before the time quantum is up, and the jobs arrive in order of smallest burst time to largest burst time, then RR will have the same response time as SRTN. 
+3. The average response time will increase as well. If this is done in the simulator, there might be an increase in average wait time/turnaround time, but this is not necessarily tied to the response time. Response time is the sum of executions times of all previous jobs, but wait time and turnaround time is just the time from arrival to execution, and time from arrival to execution + burst time respectively. This may or may not increase if simply the burst time is increased.
+4. Response time increases because in the worst case the time a process needs to wait before it can be executed again the time quantum times the number of other active jobs. So if a system has n process and a time quantum q, in the worst case it will need to wait q * (n - 1). It is n-1 because it itself is not part of the count, as it is waiting. 
